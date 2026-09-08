@@ -7,8 +7,8 @@ Get files locally
         git pull # Get latest changes from github
         
 Branches
-  Branch to create a new version of the entire repository. Work on new code here, merge with main later
-    Name Branches based on the task you are working on
+Branch to create a new version of the entire repository. Work on new code here, merge with main later
+Name Branches based on the task you are working on
         
         git branch # See branches 
           git branch feature/<task/branch name> # create branch without switching
