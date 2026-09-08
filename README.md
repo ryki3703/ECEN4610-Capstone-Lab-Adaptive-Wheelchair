@@ -2,14 +2,25 @@
 
 git clone <URL> # Download repository 
 git status # See current state 
+
 git branch # See branches 
   git branch feature/<task/branch name> # create branch without switching
-git checkout <branch name> # Switch branches 
-git checkout -b <branch name> # Create + switch branch 
-git pull # Get latest changes
-git add . # Stage changes
+git checkout <branchname> # Switch branches 
+git checkout -b <branchname> # Create + switch branch 
+
+git pull # Get latest changes from github
+
+                      Commit Changes to Github
+git add filename1.c filename2.c # Stage changes for multiple files
+  git add foldername/ # Stage changes for entire folder
+  git add . # add everything in current directory
+  
 git commit -m "message" # Save changes 
+
 git push # Upload changes
+  git push -u origin feature/<branchname> # first push of a new branch
+  git push origin --delete feature/<branchname> # deletes branch from github
+  git branch -d feature/<branchname> # deletes branch locally
   
 git fetch # Download remote information
 
