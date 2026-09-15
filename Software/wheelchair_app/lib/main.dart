@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mjpeg_view/mjpeg_view.dart';
 
 void main() {
   runApp(const WheelchairApp());
@@ -24,6 +25,8 @@ class WheelchairApp extends StatelessWidget {
 class CameraScreen extends StatelessWidget {
   const CameraScreen({super.key});
 
+  static const String cameraUrl = 'http://192.168.4.1:81/stream';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,29 +35,32 @@ class CameraScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 600,
-              height: 400,
-              color: Colors.black,
-              child: const Center(
-                child: Text(
-                  'ESP32-CAM',
-                  style: TextStyle(fontSize: 24),
-                ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: MjpegView(
+                uri: cameraUrl,
+                fit: BoxFit.contain,
+                fps: 20,
+                loadingWidget: (context) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                },
+                errorWidget: (context) {
+                  return const Center(
+                    child: Text(
+                      'Camera connection failed',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Camera disconnected',
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: 18,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
