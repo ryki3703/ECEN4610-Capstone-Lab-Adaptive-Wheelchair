@@ -23,6 +23,15 @@
 #include "camera_index.h"
 #include "board_config.h"
 
+#include <esp_now.h>
+
+#include "CommandProtocol.h"
+
+// Defined in CameraWebServer.ino
+extern const uint8_t hubMac[6];
+extern uint32_t driveSession;
+extern uint32_t driveSequence;
+
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
 #endif
@@ -685,23 +694,64 @@ static esp_err_t drive_handler(httpd_req_t *req) {
 
   free(buf);
 
-  // Validate against the existing CommandProtocol ranges.
+  // Validate input before creating an ESP-NOW packet.
   if (x < -1000 || x > 1000 ||
       y < -1000 || y > 1000 ||
       speed < 0 || speed > 2) {
+
     httpd_resp_set_status(req, "400 Bad Request");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
     return httpd_resp_sendstr(req, "Invalid drive state");
   }
 
-  Serial.printf(
-    "APP DRIVE  X: %d  Y: %d  Speed: %d\n",
-    x,
-    y,
-    speed
+  CommandProtocol::InputState state;
+
+  state.x = static_cast<int16_t>(x);
+  state.y = static_cast<int16_t>(y);
+  state.speed =
+      static_cast<CommandProtocol::SpeedMode>(speed);
+
+  const CommandProtocol::DrivePacket packet =
+      CommandProtocol::driveState(
+          state,
+          driveSession,
+          ++driveSequence
+      );
+
+  esp_err_t sendResult = esp_now_send(
+      hubMac,
+      packet.bytes,
+      sizeof(packet.bytes)
   );
 
-  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  Serial.printf(
+      "APP DRIVE X:%d Y:%d Speed:%d Seq:%lu ESP-NOW:%s\n",
+      x,
+      y,
+      speed,
+      (unsigned long)driveSequence,
+      sendResult == ESP_OK ? "QUEUED" : "ERROR"
+  );
+
+  httpd_resp_set_hdr(
+      req,
+      "Access-Control-Allow-Origin",
+      "*"
+  );
+
+  if (sendResult != ESP_OK) {
+    httpd_resp_set_status(
+        req,
+        "503 Service Unavailable"
+    );
+
+    return httpd_resp_sendstr(
+        req,
+        "ESP-NOW send failed"
+    );
+  }
+
   return httpd_resp_sendstr(req, "OK");
 }
 

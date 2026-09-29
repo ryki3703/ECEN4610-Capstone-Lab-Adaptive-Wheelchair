@@ -44,13 +44,18 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   int speed = 0; // 0 = Slow, 1 = Medium, 2 = Max
   int sequence = 0;
 
+  // Prevent overlapping HTTP drive requests.
+  bool driveRequestInFlight = false;
+  bool driveUpdatePending = false;
+
   // Temporary nonzero session ID for this app launch.
-  // We'll replace this with a proper generated value.
   final int session = DateTime.now().millisecondsSinceEpoch;
+
   @override
   void initState() {
     super.initState();
 
+    // Send the latest joystick state 20 times per second.
     driveTimer = Timer.periodic(
       const Duration(milliseconds: 50),
       (_) => sendDriveState(),
@@ -58,44 +63,72 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   }
 
   void updateJoystick(double rawX, double rawY) {
-    setState(() {
-      x = (rawX * 1000).round().clamp(-1000, 1000);
-      y = (rawY * 1000).round().clamp(-1000, 1000);
-    });
-  }
+    int newX = (rawX * 1000).round().clamp(-1000, 1000);
+    int newY = (rawY * 1000).round().clamp(-1000, 1000);
 
-  void resetJoystick() {
+    // Ignore tiny movements around the center.
+    const int deadband = 30;
+
+    if (newX.abs() < deadband) {
+      newX = 0;
+    }
+
+    if (newY.abs() < deadband) {
+      newY = 0;
+    }
+
+    // Don't rebuild the UI if the values haven't changed.
+    if (newX == x && newY == y) {
+      return;
+    }
+
     setState(() {
-      x = 0;
-      y = 0;
+      x = newX;
+      y = newY;
     });
   }
 
   Future<void> sendDriveState() async {
-    sequence++;
+    if (driveRequestInFlight) {
+      driveUpdatePending = true;
+      return;
+    }
+
+    driveRequestInFlight = true;
+
+    final int sendX = x;
+    final int sendY = y;
+    final int sendSpeed = speed;
 
     final uri = Uri.parse(
       '$driveUrl'
-      '?x=$x'
-      '&y=$y'
-      '&speed=$speed',
+      '?x=$sendX'
+      '&y=$sendY'
+      '&speed=$sendSpeed',
     );
-
-    debugPrint('SENDING: $uri');
 
     try {
       final response = await http
           .get(uri)
-          .timeout(const Duration(milliseconds: 250));
+          .timeout(const Duration(milliseconds: 450));
 
       debugPrint(
-        'RESPONSE: ${response.statusCode} ${response.body}',
+        'DRIVE $sendX,$sendY -> ${response.statusCode}',
       );
     } catch (e) {
       debugPrint('DRIVE ERROR: $e');
+    } finally {
+      driveRequestInFlight = false;
+
+      // Immediately send the latest joystick state if anything
+      // changed while the previous request was running.
+      if (driveUpdatePending) {
+        driveUpdatePending = false;
+        sendDriveState();
+      }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,10 +184,16 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
                   height: 250,
                   child: Joystick(
                     mode: JoystickMode.all,
+
+                    // Update joystick state quickly while dragging.
+                    period: const Duration(milliseconds: 20),
+
                     listener: (details) {
-                      updateJoystick(details.x, details.y);
+                      updateJoystick(
+                        details.x,
+                        details.y,
+                      );
                     },
-                    onStickDragEnd: resetJoystick,
                   ),
                 ),
               ],
@@ -164,6 +203,7 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
       ),
     );
   }
+
   @override
   void dispose() {
     driveTimer?.cancel();

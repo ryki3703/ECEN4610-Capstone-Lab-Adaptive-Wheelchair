@@ -2,10 +2,15 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 
+#include <esp_now.h>
+#include <esp_wifi.h>
+#include <esp_random.h>
+
 // ===========================
 // Select camera model in board_config.h
 // ===========================
 #include "board_config.h"
+#include "CommandProtocol.h"
 
 // ===========================
 // Enter your WiFi credentials
@@ -13,8 +18,49 @@
 const char *ap_ssid = "Wheelchair-001";
 const char *ap_password = "WheelchairB3";
 
+constexpr uint8_t WIFI_CHANNEL = 6;
+
+extern const uint8_t hubMac[6] = {
+  0x30, 0x30, 0xF9, 0x15, 0x26, 0x54
+};
+
+uint32_t driveSession = 0;
+uint32_t driveSequence = 0;
+
 void startCameraServer();
 void setupLedFlash();
+
+bool setupEspNow() {
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return false;
+  }
+
+  esp_now_peer_info_t peer = {};
+
+  memcpy(peer.peer_addr, hubMac, 6);
+  peer.channel = WIFI_CHANNEL;
+  peer.ifidx = WIFI_IF_AP;
+  peer.encrypt = false;
+
+  if (!esp_now_is_peer_exist(hubMac)) {
+    if (esp_now_add_peer(&peer) != ESP_OK) {
+      Serial.println("Failed to add S3 ESP-NOW peer");
+      return false;
+    }
+  }
+
+  do {
+    driveSession = esp_random();
+  } while (driveSession == 0);
+
+  Serial.print("Drive session: ");
+  Serial.println(driveSession);
+
+  Serial.println("ESP-NOW ready");
+
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -107,9 +153,14 @@ void setup() {
   setupLedFlash();
 #endif
 
-  WiFi.softAP(ap_ssid, ap_password);
+  WiFi.softAP(
+    ap_ssid,
+    ap_password,
+    WIFI_CHANNEL
+  );
 
   WiFi.setSleep(false);
+  setupEspNow();
 
   Serial.println("");
   Serial.println("Access Point started");
