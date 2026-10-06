@@ -63,8 +63,8 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   }
 
   void updateJoystick(double rawX, double rawY) {
-    int newX = (rawX * 1000).round().clamp(-1000, 1000);
-    int newY = (rawY * 1000).round().clamp(-1000, 1000);
+    int newX = (-rawX * 1000).round().clamp(-1000, 1000);
+    int newY = (-rawY * 1000).round().clamp(-1000, 1000);
 
     // Ignore tiny movements around the center.
     const int deadband = 30;
