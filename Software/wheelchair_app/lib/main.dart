@@ -88,6 +88,12 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
     });
   }
 
+  void changeSpeed() {
+    setState(() {
+      speed = (speed + 1) % 3;
+    });
+  }
+
   Future<void> sendDriveState() async {
     if (driveRequestInFlight) {
       driveUpdatePending = true;
@@ -173,6 +179,20 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Speed control
+                SizedBox(
+                  width: 200,
+                  child: ElevatedButton(
+                    onPressed: changeSpeed,
+                    child: Text(
+                      speed == 0 ? 'SPEED: SLOW' : speed == 1 ? 'SPEED: MEDIUM' : 'SPEED: MAX',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,),
+                    ),
                   ),
                 ),
 
