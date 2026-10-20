@@ -32,9 +32,12 @@ namespace HubConfig
     constexpr uint8_t UART_RX_PIN = 18;
 
     constexpr uint8_t WIFI_CHANNEL = 6; // Must match remote/camera AP.
-    constexpr uint8_t REMOTE_MAC[6] = {0x28, 0x84, 0x85, 0xB3, 0xA0, 0x44}; // Remote allowed to send commands and receive status
+    constexpr uint8_t REMOTE_MAC[6] = {0x28, 0x84, 0x85, 0xB3, 0xA0, 0x44}; // Remote Controller MAC
+    constexpr uint8_t CAM_MAC[6] = {0x7C, 0x4F, 0xAD, 0x1F, 0x70, 0x14}; // CAM MAC 
+    /* Test Cam MAC
     constexpr uint8_t CAM_MAC[6] = {0x8C, 0x4F, 0x00, 0xAC, 0x20, 0x01}; // Camera's MAC address for status updates
-
+    */
+   
     constexpr uint32_t COMMAND_TIMEOUT_MS = 500;    // Stop when fresh drive input has been absent this long
     constexpr uint32_t MAX_QUEUE_AGE_MS = 100;      // Reject commands that waited too long in the input queue
     constexpr uint32_t BUTTON_DEBOUNCE_MS = 40;     // Time a button reading must remain unchanged
@@ -60,8 +63,8 @@ namespace HubConfig
 
     // Verify neutral and travel calibration for the NE and SE linkages.
     // Neutral servo angles in degrees - Reposition the horns mechanically for the new mount
-    constexpr float NE_CENTER = 85.0f;
-    constexpr float SE_CENTER = 85.0f;
+    constexpr float NE_CENTER = 84.0f;
+    constexpr float SE_CENTER = 86.0f;
 
     // Minimum and maximum angles for each servo
     constexpr float NE_MIN = 0.0f;
@@ -70,8 +73,8 @@ namespace HubConfig
     constexpr float SE_MAX = 180.0f;
 
     // Reverse a joystick axis before mixing the NE and SE servo movement
-    constexpr bool INVERT_X = false;
-    constexpr bool INVERT_Y = false;
+    constexpr bool INVERT_X = true;
+    constexpr bool INVERT_Y = true;
 
     // Pulse widths used to map angle commands to the servo signal
     constexpr int SERVO_MIN_US = 500;
@@ -81,9 +84,9 @@ namespace HubConfig
     constexpr float SERVO_DEGREES_PER_SECOND = 125.0f; 
 
     // Allowed fraction of travel from center for each speed mode
-    constexpr float SLOW_TRAVEL = 0.35f;
-    constexpr float MEDIUM_TRAVEL = 0.65f;
-    constexpr float MAX_TRAVEL = 1.0f;
+    constexpr float SLOW_TRAVEL = 0.15f;
+    constexpr float MEDIUM_TRAVEL = 0.35f;
+    constexpr float MAX_TRAVEL = 0.60f;
 
     // Check that each neutral angle lies inside its travel limits
     static_assert(NE_MIN < NE_CENTER && NE_CENTER < NE_MAX &&

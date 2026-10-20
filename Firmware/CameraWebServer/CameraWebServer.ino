@@ -20,9 +20,15 @@ const char *ap_password = "WheelchairB3";
 
 constexpr uint8_t WIFI_CHANNEL = 6;
 
+/* Test S3 MAC address 
+  extern const uint8_t hubMac[6] = {
+    0x30, 0x30, 0xF9, 0x15, 0x26, 0x54
+  };
+*/
+
 extern const uint8_t hubMac[6] = {
-  0x30, 0x30, 0xF9, 0x15, 0x26, 0x54
-};
+    0x44, 0xB1, 0x76, 0xCD, 0x7A, 0x24
+  };
 
 uint32_t driveSession = 0;
 uint32_t driveSequence = 0;

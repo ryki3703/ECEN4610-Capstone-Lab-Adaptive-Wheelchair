@@ -136,7 +136,7 @@ public:
 
 private:
     CommandProtocol::SpeedMode localSpeed = CommandProtocol::SpeedMode::Slow;
-    ReceiverMode selectedMode = ReceiverMode::App;   // Startup input source
+    ReceiverMode selectedMode = ReceiverMode::Controller;   // Startup input source
     CommandProtocol::InputState state;                  // Accepted axes and speed used by the servo controller
     bool armed = false;                                 // Movement enabled after neutral input
     bool haveDrive = false;                             // A drive packet is being tracked for timeout

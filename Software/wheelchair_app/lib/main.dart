@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_joystick/flutter_joystick.dart';
-import 'package:mjpeg_view/mjpeg_view.dart';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_joystick/flutter_joystick.dart';
 import 'package:http/http.dart' as http;
+import 'package:mjpeg_view/mjpeg_view.dart';
 
 void main() {
   runApp(const WheelchairApp());
@@ -36,20 +38,20 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   static const String cameraUrl = 'http://192.168.4.1:81/stream';
   static const String driveUrl = 'http://192.168.4.1/drive';
 
+  static const MethodChannel wifiChannel =
+      MethodChannel('wheelchair.wifi');
+
   Timer? driveTimer;
+
+  bool wifiConnecting = false;
+  bool driveRequestInFlight = false;
+  bool driveUpdatePending = false;
 
   int x = 0;
   int y = 0;
 
-  int speed = 0; // 0 = Slow, 1 = Medium, 2 = Max
-  int sequence = 0;
-
-  // Prevent overlapping HTTP drive requests.
-  bool driveRequestInFlight = false;
-  bool driveUpdatePending = false;
-
-  // Temporary nonzero session ID for this app launch.
-  final int session = DateTime.now().millisecondsSinceEpoch;
+  // 0 = Slow, 1 = Medium, 2 = Max
+  int speed = 0;
 
   @override
   void initState() {
@@ -63,10 +65,11 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   }
 
   void updateJoystick(double rawX, double rawY) {
+    // Invert both axes to match the wheelchair's directions.
     int newX = (-rawX * 1000).round().clamp(-1000, 1000);
     int newY = (-rawY * 1000).round().clamp(-1000, 1000);
 
-    // Ignore tiny movements around the center.
+    // Ignore small movements around the center.
     const int deadband = 30;
 
     if (newX.abs() < deadband) {
@@ -77,7 +80,6 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
       newY = 0;
     }
 
-    // Don't rebuild the UI if the values haven't changed.
     if (newX == x && newY == y) {
       return;
     }
@@ -88,6 +90,15 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
     });
   }
 
+  void resetJoystick() {
+    if (!mounted) return;
+
+    setState(() {
+      x = 0;
+      y = 0;
+    });
+  }
+
   void changeSpeed() {
     setState(() {
       speed = (speed + 1) % 3;
@@ -95,6 +106,7 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
   }
 
   Future<void> sendDriveState() async {
+    // Prevent overlapping HTTP requests.
     if (driveRequestInFlight) {
       driveUpdatePending = true;
       return;
@@ -119,18 +131,73 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
           .timeout(const Duration(milliseconds: 450));
 
       debugPrint(
-        'DRIVE $sendX,$sendY -> ${response.statusCode}',
+        'DRIVE $sendX,$sendY SPEED $sendSpeed '
+        '-> ${response.statusCode}',
       );
     } catch (e) {
       debugPrint('DRIVE ERROR: $e');
     } finally {
       driveRequestInFlight = false;
 
-      // Immediately send the latest joystick state if anything
-      // changed while the previous request was running.
+      // Send the latest state if a request was skipped.
       if (driveUpdatePending) {
         driveUpdatePending = false;
         sendDriveState();
+      }
+    }
+  }
+
+  Future<void> connectToWheelchair() async {
+    if (wifiConnecting) return;
+
+    setState(() {
+      wifiConnecting = true;
+    });
+
+    try {
+      final bool connected =
+          await wifiChannel.invokeMethod<bool>(
+                'connectToWheelchair',
+              ) ??
+              false;
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            connected
+                ? 'Wi-Fi connection requested successfully'
+                : 'Could not connect to Wheelchair-001',
+          ),
+        ),
+      );
+    } on MissingPluginException {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Automatic Wi-Fi connection is not available '
+            'on this platform yet.',
+          ),
+        ),
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Wi-Fi connection failed: ${e.message}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          wifiConnecting = false;
+        });
       }
     }
   }
@@ -148,32 +215,62 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Camera
+                // Connect to Wheelchair button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        wifiConnecting ? null : connectToWheelchair,
+                    child: Text(
+                      wifiConnecting
+                          ? 'CONNECTING...'
+                          : 'CONNECT TO WHEELCHAIR',
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Camera - rotated 90 degrees clockwise
                 AspectRatio(
-                  aspectRatio: 4 / 3,
+                  aspectRatio: 3 / 4,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: MjpegView(
-                      uri: cameraUrl,
-                      fit: BoxFit.contain,
-                      fps: 20,
-                      loadingWidget: (context) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                      errorWidget: (context) {
-                        return const Center(
-                          child: Text('Camera connection failed'),
-                        );
-                      },
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned.fill(
+                          child: RotatedBox(
+                            quarterTurns: 1,
+                            child: MjpegView(
+                              uri: cameraUrl,
+                              fit: BoxFit.contain,
+                              fps: 20,
+
+                              loadingWidget: (context) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              },
+
+                              errorWidget: (context) {
+                                return const Center(
+                                  child: Text(
+                                    'Camera connection failed',
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // Current joystick values
+                // Current joystick coordinates
                 Text(
                   'X: $x    Y: $y',
                   style: const TextStyle(
@@ -190,8 +287,15 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
                   child: ElevatedButton(
                     onPressed: changeSpeed,
                     child: Text(
-                      speed == 0 ? 'SPEED: SLOW' : speed == 1 ? 'SPEED: MEDIUM' : 'SPEED: MAX',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,),
+                      speed == 0
+                          ? 'SPEED: SLOW'
+                          : speed == 1
+                              ? 'SPEED: MEDIUM'
+                              : 'SPEED: MAX',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -204,16 +308,14 @@ class _WheelchairScreenState extends State<WheelchairScreen> {
                   height: 250,
                   child: Joystick(
                     mode: JoystickMode.all,
-
-                    // Update joystick state quickly while dragging.
                     period: const Duration(milliseconds: 20),
-
                     listener: (details) {
                       updateJoystick(
                         details.x,
                         details.y,
                       );
                     },
+                    onStickDragEnd: resetJoystick,
                   ),
                 ),
               ],
